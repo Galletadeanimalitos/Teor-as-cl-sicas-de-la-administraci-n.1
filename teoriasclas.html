@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Juego: Teorías Clásicas de la Administración</title>
+    <!-- Carga de Tailwind CSS para un diseño moderno y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de la fuente Inter de Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Carga de Font Awesome para iconos (como el check y la X) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Estilos generales y fuente */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Gris muy claro */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        /* Estilo para el contenedor principal de la tarjeta */
+        #game-container {
+            max-width: 600px;
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            transition: all 0.3s ease-in-out;
+        }
+        /* Estilo de los botones de respuesta */
+        .answer-button {
+            transition: transform 0.1s, box-shadow 0.1s;
+            background-color: #3b82f6; /* Azul brillante */
+            color: white;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 15px;
+            box-shadow: 0 4px #2563eb; /* Sombra sutil */
+        }
+        .answer-button:hover:not(:disabled) {
+            background-color: #2563eb;
+            transform: translateY(1px);
+            box-shadow: 0 3px #1d4ed8;
+        }
+        .answer-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+        /* Estilos para retroalimentación */
+        .correct {
+            background-color: #10b981; /* Verde */
+            box-shadow: 0 4px #059669;
+        }
+        .incorrect {
+            background-color: #ef4444; /* Rojo */
+            box-shadow: 0 4px #dc2626;
+        }
+        /* Estilo del área de feedback */
+        #feedback {
+            border-left: 5px solid #d1d5db;
+            padding-left: 15px;
+            margin-top: 20px;
+            font-size: 16px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Teorías Clásicas: El Repaso</h1>
+    <div id="score-board" class="text-center text-xl font-medium text-gray-600 mb-6 p-3 border-b border-gray-200">
+        Puntuación: <span id="current-score" class="font-bold text-blue-600">0</span> / <span id="total-questions">0</span>
+    </div>
+
+    <!-- Área de la Pregunta -->
+    <div id="quiz-area">
+        <p id="question-text" class="text-2xl font-semibold text-gray-700 mb-8 text-center">Cargando pregunta...</p>
+
+        <!-- Contenedor de Botones de Respuesta -->
+        <div id="answer-buttons" class="grid grid-cols-1 gap-4">
+            <button class="answer-button" data-theorist="Taylor">F. W. Taylor</button>
+            <button class="answer-button" data-theorist="Fayol">H. Fayol</button>
+            <button class="answer-button" data-theorist="Weber">M. Weber</button>
+        </div>
+
+        <!-- Área de Retroalimentación y Siguiente Pregunta -->
+        <div id="feedback-area" class="mt-8 hidden">
+            <div id="feedback" class="p-4 bg-gray-50 rounded-lg">
+                <!-- Aquí se inyecta el feedback -->
+            </div>
+            <button id="next-button" class="answer-button w-full mt-6 bg-green-500 hover:bg-green-600 shadow-none hover:shadow-none" style="box-shadow: 0 4px #047857;" onclick="nextQuestion()">
+                Siguiente Pregunta
+            </button>
+        </div>
+    </div>
+
+    <!-- Área de Resultado Final (oculta inicialmente) -->
+    <div id="result-area" class="text-center hidden">
+        <h2 class="text-4xl font-bold text-gray-800 mb-4">¡Juego Terminado!</h2>
+        <p class="text-2xl text-gray-600 mb-6">Tu puntuación final es:</p>
+        <p class="text-6xl font-extrabold text-blue-600 mb-8"><span id="final-score">0</span> / <span id="final-total">0</span></p>
+        <p id="result-message" class="text-xl font-semibold mb-8 text-gray-700"></p>
+        <button class="answer-button bg-purple-500 hover:bg-purple-600" style="box-shadow: 0 4px #7c3aed;" onclick="startGame()">
+            Jugar de Nuevo
+        </button>
+    </div>
+
+</div>
+
+<script>
+    // Variables globales
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let questionsPlayed = 0;
+    const NUM_QUESTIONS = 8; // Número total de preguntas a jugar
+    let availableQuestions = []; // Array de preguntas disponibles para jugar
+    let usedQuestionIndices = new Set(); // Conjunto para evitar preguntas repetidas
+
+    // Datos de las preguntas (Teorista: Taylor, Fayol, o Weber)
+    const allQuestions = [
+        {
+            statement: "¿A qué teórico se atribuye la aplicación de estudios científicos de tiempo y movimiento para optimizar cada tarea manual y eliminar el ocio del trabajador?",
+            answer: "Taylor",
+            explanation: "Taylor fue el pionero de la Administración Científica. Su enfoque principal era la optimización de la eficiencia en el nivel operativo a través del análisis riguroso del trabajo."
+        },
+        {
+            statement: "¿Qué teórico propuso que toda actividad gerencial se basa en cinco funciones esenciales: Planificar, Organizar, Dirigir, Coordinar y Controlar?",
+            answer: "Fayol",
+            explanation: "Fayol, el padre de la Teoría Clásica (o General), definió estas cinco funciones como la base de la administración en cualquier tipo de organización."
+        },
+        {
+            statement: "¿Qué teórico defendió que el poder en la organización debe legitimarse a través de un sistema de reglas y procedimientos formales, conocido como burocracia ideal?",
+            answer: "Weber",
+            explanation: "Weber desarrolló el Modelo Burocrático Racional-Legal. Su énfasis estaba en la impersonalidad, la jerarquía, las reglas escritas y la competencia técnica para garantizar la eficiencia."
+        },
+        {
+            statement: "¿Quién defendió la 'Unidad de Mando', donde cada empleado solo debe recibir órdenes de un superior para evitar conflictos?",
+            answer: "Fayol",
+            explanation: "Este es uno de los famosos 14 Principios de la Administración de Fayol, centrado en la estructura y el orden dentro de la organización."
+        },
+        {
+            statement: "¿Qué teórico se basó en el concepto del 'Homo Economicus' que motiva al trabajador únicamente por recompensas económicas y castigos, enfatizando el incentivo salarial por productividad?",
+            answer: "Taylor",
+            explanation: "Taylor creía que el dinero era el principal motor del trabajador. Su sistema de tarifas por pieza ligaba directamente el pago a la productividad individual."
+        },
+        {
+            statement: "¿Qué teórico estableció la distinción entre las operaciones técnicas, comerciales, financieras, de seguridad, de contabilidad y administrativas de la empresa?",
+            answer: "Fayol",
+            explanation: "Fayol clasificó todas las operaciones de una empresa en estas seis categorías funcionales, siendo las administrativas la clave para el éxito."
+        },
+        {
+            statement: "¿Qué teórico argumentó que la 'máxima prosperidad para el empleador' debía ir siempre acompañada de la 'máxima prosperidad para el empleado'?",
+            answer: "Taylor",
+            explanation: "Este era el objetivo dual de la Administración Científica, logrado a través de la eliminación de la ineficiencia y el aumento de la productividad."
+        },
+        {
+            statement: "¿Su modelo ideal de organización se basa en la impersonalidad de las relaciones, la jerarquía de autoridad bien definida y la clara división del trabajo?",
+            answer: "Weber",
+            explanation: "Estas son las características esenciales de la burocracia, según Weber. El objetivo era eliminar el favoritismo y la ineficiencia que resultan de las relaciones personales."
+        }
+    ];
+
+    // Elementos del DOM
+    const questionText = document.getElementById('question-text');
+    const answerButtonsContainer = document.getElementById('answer-buttons');
+    // Convertir a Array para usar métodos como forEach
+    const answerButtons = Array.from(answerButtonsContainer.querySelectorAll('.answer-button'));
+    const scoreSpan = document.getElementById('current-score');
+    const totalSpan = document.getElementById('total-questions');
+    const finalScoreSpan = document.getElementById('final-score');
+    const finalTotalSpan = document.getElementById('final-total');
+    const resultMessage = document.getElementById('result-message');
+    const resultArea = document.getElementById('result-area');
+    const quizArea = document.getElementById('quiz-area');
+    const feedbackArea = document.getElementById('feedback-area');
+    const feedbackDiv = document.getElementById('feedback');
+
+    // Inicializa el juego
+    document.addEventListener('DOMContentLoaded', () => {
+        // Asegura que los contadores muestren el número total de preguntas desde el inicio
+        totalSpan.textContent = NUM_QUESTIONS;
+        finalTotalSpan.textContent = NUM_QUESTIONS;
+        startGame();
+    });
+
+    /**
+     * Selecciona aleatoriamente las preguntas para el juego sin repetir.
+     */
+    function selectQuestions() {
+        const tempIndices = Array.from({ length: allQuestions.length }, (_, i) => i);
+        availableQuestions = [];
+        
+        // Barajar las preguntas disponibles (algoritmo Fisher-Yates)
+        for (let i = tempIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tempIndices[i], tempIndices[j]] = [tempIndices[j], tempIndices[i]];
+        }
+
+        // Seleccionar solo las primeras NUM_QUESTIONS (si hay más preguntas disponibles)
+        const selectedIndices = tempIndices.slice(0, NUM_QUESTIONS);
+        selectedIndices.forEach(index => {
+            availableQuestions.push(allQuestions[index]);
+        });
+    }
+
+    /**
+     * Comienza o reinicia el juego.
+     */
+    function startGame() {
+        score = 0;
+        questionsPlayed = 0;
+        currentQuestionIndex = 0;
+        selectQuestions(); // Selecciona un nuevo conjunto de preguntas
+
+        scoreSpan.textContent = score;
+        resultArea.classList.add('hidden'); // Oculta resultados finales
+        quizArea.classList.remove('hidden'); // Muestra el área del quiz
+
+        loadQuestion();
+    }
+
+    /**
+     * Carga la pregunta actual en la interfaz.
+     */
+    function loadQuestion() {
+        // Verifica si ya se jugaron todas las preguntas
+        if (questionsPlayed >= NUM_QUESTIONS) {
+            showResults();
+            return;
+        }
+
+        const currentQ = availableQuestions[currentQuestionIndex];
+        
+        questionText.textContent = currentQ.statement;
+        feedbackArea.classList.add('hidden'); // Oculta el feedback y el botón Siguiente
+        feedbackDiv.innerHTML = '';
+        
+        // Restablecer estilos, habilitar botones y re-adjuntar el listener
+        answerButtons.forEach(button => {
+            // Limpia las clases de retroalimentación de la pregunta anterior
+            button.classList.remove('correct', 'incorrect');
+            button.classList.remove('text-white', 'bg-blue-300', 'bg-green-500', 'bg-red-500');
+            // Asegura el estilo base
+            button.classList.add('bg-blue-500'); 
+            button.disabled = false; // Habilita el botón
+            // Limpia listeners duplicados antes de adjuntar uno nuevo
+            button.removeEventListener('click', handleAnswer);
+            button.addEventListener('click', handleAnswer);
+            button.style.boxShadow = '0 4px #2563eb'; // Restaura la sombra
+        });
+    }
+
+    /**
+     * Maneja la selección de una respuesta por parte del usuario.
+     * @param {Event} event - El evento de clic del botón.
+     */
+    function handleAnswer(event) {
+        const selectedButton = event.currentTarget;
+        const selectedTheorist = selectedButton.dataset.theorist;
+        const currentQuestion = availableQuestions[currentQuestionIndex];
+        const correctTheorist = currentQuestion.answer;
+        const explanation = currentQuestion.explanation;
+
+        // Deshabilitar todos los botones para evitar doble clic y fijar la respuesta
+        answerButtons.forEach(button => {
+            button.disabled = true;
+            button.removeEventListener('click', handleAnswer);
+        });
+
+        questionsPlayed++;
+
+        if (selectedTheorist === correctTheorist) {
+            score++;
+            selectedButton.classList.add('correct');
+            feedbackDiv.innerHTML = `<p class="font-bold text-green-700">¡Correcto! <i class="fa-solid fa-check"></i></p><p>${explanation}</p>`;
+            feedbackDiv.style.borderLeftColor = '#10b981'; // Borde verde
+        } else {
+            selectedButton.classList.add('incorrect');
+            // Resaltar la respuesta correcta
+            const correctButton = answerButtons.find(btn => btn.dataset.theorist === correctTheorist);
+            if (correctButton) {
+                // Se asegura de que la respuesta correcta sea visible y marcada
+                correctButton.classList.remove('bg-blue-500');
+                correctButton.classList.add('correct');
+            }
+            feedbackDiv.innerHTML = `<p class="font-bold text-red-700">Incorrecto. La respuesta correcta era ${correctTheorist}. <i class="fa-solid fa-times"></i></p><p>${explanation}</p>`;
+            feedbackDiv.style.borderLeftColor = '#ef4444'; // Borde rojo
+        }
+
+        scoreSpan.textContent = score;
+        feedbackArea.classList.remove('hidden'); // Muestra el área de feedback y botón Siguiente
+    }
+
+    /**
+     * Pasa a la siguiente pregunta.
+     */
+    function nextQuestion() {
+        currentQuestionIndex++;
+        loadQuestion();
+    }
+
+    /**
+     * Muestra la pantalla de resultados finales.
+     */
+    function showResults() {
+        quizArea.classList.add('hidden');
+        resultArea.classList.remove('hidden');
+        finalScoreSpan.textContent = score;
+        
+        let message = '';
+        const percentage = (score / NUM_QUESTIONS) * 100;
+
+        if (percentage === 100) {
+            message = "¡Felicidades! Tienes un dominio excepcional de las teorías clásicas. ¡Eres un maestro de la administración!";
+        } else if (percentage >= 75) {
+            message = "¡Muy bien! Tienes un gran conocimiento. Sigue así, solo unos pocos puntos para la perfección.";
+        } else if (percentage >= 50) {
+            message = "Conocimiento sólido. Repasa las explicaciones y los principios clave para reforzar tu comprensión.";
+        } else {
+            message = "Es hora de repasar. Concentra tus esfuerzos en diferenciar los aportes fundamentales de cada teórico (Taylor, Fayol, Weber).";
+        }
+        
+        resultMessage.textContent = message;
+    }
+</script>
+</body>
+</html>
